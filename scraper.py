@@ -8,8 +8,8 @@ import time
 
 
 ind = {'most_relevant' : 0 , 'newest' : 1, 'highest_rating' : 2, 'lowest_rating' : 3 }
-HEADER = ['id_review', 'caption', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user']
-HEADER_W_SOURCE = ['id_review', 'caption', 'relative_date','retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user', 'url_source']
+HEADER = ['id_review', 'caption', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'url_user', 'r_additional'] #'n_photo_user'
+HEADER_W_SOURCE = ['id_review', 'caption', 'relative_date','retrieval_date', 'rating', 'username', 'n_review_user', 'url_user', 'r_additional', 'url_source'] #'n_photo_user'
 
 def csv_writer(source_field, ind_sort_by, path='data/'):
     outfile= ind_sort_by + '_gm_reviews.csv'
@@ -40,35 +40,39 @@ if __name__ == '__main__':
     # store reviews in CSV file
     writer = csv_writer(args.source, args.sort_by)
 
-    with GoogleMapsScraper(debug=args.debug) as scraper:
-        with open(args.i, 'r') as urls_file:
-            for url in urls_file:
-                if args.place:
-                    print(scraper.get_account(url))
+with GoogleMapsScraper(debug=args.debug) as scraper:
+    print("Scraper initialized successfully.")
+    with open(args.i, 'r') as urls_file:
+        for url in urls_file:
+            print(f"Processing URL: {url.strip()}")
+            if args.place:
+                account_info = scraper.get_account(url)
+                print(f"Account Info: {account_info}")
+            else:
+                print("Attempting to sort reviews...")
+                error = scraper.sort_by(url, ind[args.sort_by])
+                print(f"Sort result: {error}")
+
+                if error == 0:
+                    n = 0
+                    print(f"Starting to scrape reviews for {url.strip()}...")
+
+                    while n < args.N:
+                        print(colored(f'[Review {n}]', 'cyan'))
+                        reviews = scraper.get_reviews(n)
+                        print(f"Number of reviews fetched: {len(reviews)}")
+
+                        if len(reviews) == 0:
+                            print("No more reviews to fetch. Breaking out of the loop.")
+                            break
+
+                        for r in reviews:
+                            row_data = list(r.values())
+                            if args.source:
+                                row_data.append(url[:-1])
+                            writer.writerow(row_data)
+                            print(f"Review written to CSV")#: {row_data}")
+
+                        n += len(reviews)
                 else:
-                    error = scraper.sort_by(url, ind[args.sort_by])
-
-                    if error == 0:
-
-                        n = 0
-
-                        #if ind[args.sort_by] == 0:
-                        #    scraper.more_reviews()
-
-                        while n < args.N:
-
-                            # logging to std out
-                            print(colored('[Review ' + str(n) + ']', 'cyan'))
-
-                            reviews = scraper.get_reviews(n)
-                            if len(reviews) == 0:
-                                break
-
-                            for r in reviews:
-                                row_data = list(r.values())
-                                if args.source:
-                                    row_data.append(url[:-1])
-
-                                writer.writerow(row_data)
-
-                            n += len(reviews)
+                    print(f"Error encountered when sorting reviews for URL: {url.strip()}")
