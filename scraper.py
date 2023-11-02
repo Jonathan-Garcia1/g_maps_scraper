@@ -6,9 +6,13 @@ import csv
 from termcolor import colored
 import time
 
+import requests
+from stem import Signal
+from stem.control import Controller
+
 
 ind = {'most_relevant' : 0 , 'newest' : 1, 'highest_rating' : 2, 'lowest_rating' : 3 }
-HEADER = ['id_review', 'caption', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'url_user', 'r_additional'] #'n_photo_user'
+HEADER = ['id', 'id_review', 'caption', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'url_user', 'r_additional'] #'n_photo_user'
 HEADER_W_SOURCE = ['id_review', 'caption', 'relative_date','retrieval_date', 'rating', 'username', 'n_review_user', 'url_user', 'r_additional', 'url_source'] #'n_photo_user'
 
 def csv_writer(source_field, ind_sort_by, path='data/'):
@@ -42,8 +46,24 @@ if __name__ == '__main__':
 
 with GoogleMapsScraper(debug=args.debug) as scraper:
     print("Scraper initialized successfully.")
+    
+    count = 0
+    renew_interval = 10  # Renew IP every 10 places
+    
+    # Test Tor connection
+    if not scraper.test_tor_connection():
+        print("Exiting: Tor connection failed.")
+        exit(1)
+        
     with open(args.i, 'r') as urls_file:
-        for url in urls_file:
+        #This section starts the inclusion of ID
+        reader = csv.DictReader(urls_file)
+        for row in reader:
+            url_id = row['id']
+            url = row['url']
+            # Ends the inclusion of ID
+
+            # for url in urls_file:
             print(f"Processing URL: {url.strip()}")
             if args.place:
                 account_info = scraper.get_account(url)
@@ -51,14 +71,14 @@ with GoogleMapsScraper(debug=args.debug) as scraper:
             else:
                 print("Attempting to sort reviews...")
                 error = scraper.sort_by(url, ind[args.sort_by])
-                print(f"Sort result: {error}")
+                print(f"Errors while readying to scrape: {error}")
 
                 if error == 0:
                     n = 0
                     print(f"Starting to scrape reviews for {url.strip()}...")
 
                     while n < args.N:
-                        print(colored(f'[Review {n}]', 'cyan'))
+                        print(colored(f'[Scraping from review {n}]', 'cyan'))
                         reviews = scraper.get_reviews(n)
                         print(f"Number of reviews fetched: {len(reviews)}")
 
@@ -67,7 +87,10 @@ with GoogleMapsScraper(debug=args.debug) as scraper:
                             break
 
                         for r in reviews:
-                            row_data = list(r.values())
+                            ##This section starts the inclusion of ID
+                            # row_data = list(r.values())
+                            row_data = [url_id] + list(r.values())
+                            # Ends inclusion of ID
                             if args.source:
                                 row_data.append(url[:-1])
                             writer.writerow(row_data)
@@ -76,3 +99,10 @@ with GoogleMapsScraper(debug=args.debug) as scraper:
                         n += len(reviews)
                 else:
                     print(f"Error encountered when sorting reviews for URL: {url.strip()}")
+
+            # Increment count and check if it's time to renew IP
+            count += 1
+            print(f'The current page count is {count}')
+            if count % renew_interval == 0:
+                print("Renewing Tor IP...")
+                scraper.renew_tor_ip()
