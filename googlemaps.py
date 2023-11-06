@@ -23,6 +23,7 @@ import numpy as np
 import itertools
 
 import env
+import os
 
 GM_WEBPAGE = 'https://www.google.com/maps/'
 MAX_WAIT = 10
@@ -95,9 +96,9 @@ class GoogleMapsScraper:
             logging.debug("Exception encountered:")
             traceback.print_exception(exc_type, exc_value, tb)
 
-        logging.debug("Closing and quitting driver.")
-        self.driver.close()
-        self.driver.quit()
+        # logging.debug("Closing and quitting driver.")
+        # self.driver.close()
+        # self.driver.quit()
         logging.debug("Driver closed and quit successfully.")
 
         return True
@@ -174,6 +175,8 @@ class GoogleMapsScraper:
                 logging.debug("Navigation to search point URL successful.")
             except NoSuchElementException:
                 logging.debug("Navigation failed. Restarting driver and retrying...")
+                os.system('afplay /System/Library/Sounds/Ping.aiff')
+                time.sleep(30)
                 self.driver.quit()
                 self.driver = self.__get_driver()
                 self.driver.get(search_point_url)
